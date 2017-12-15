@@ -60,10 +60,11 @@ type
 ##  A preconditioner, which preconditions v at x to return vpre. 
 ##    (The meaning of "preconditioning" is algorithm-dependent.)
 
-type ##  Naming conventions:
+type
+    ##  Naming conventions:
     ## 
     ##         NLOPT_{G/L}{D/N}_* 
-    ## 	    = global/local derivative/no-derivative optimization, 
+    ## 	             = global/local derivative/no-derivative optimization, 
     ##               respectively 
     ##  
     ## _RAND algorithms involve some randomization.
