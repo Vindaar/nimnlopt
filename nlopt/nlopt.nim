@@ -18,6 +18,19 @@ type
     initial_step: float
     status: nlopt_result
     func: nlopt_func
+
+  # NloptFunc is the user defined function, which takes
+  # - an input seq or openArray (to be impl'd)
+    # - one element for each parameter to fit
+  # - a mutable gradient for the gradients 
+    # - d func / dx_i, i for each parameter in x
+  # func_data: object = a user defined object, which can be used
+    # to hand specific data to the user defined function, if desired
+    # - e.g. if for each parameter, f depends on an array of input data
+    #   one can create an object, which stores said data, hand it to
+    #   NloptFunc and it will be available in the function
+  NloptFunc = proc [T](x: seq[T], gradient: var seq[T], func_data: object): float
+                  
           
 # * = proc (n: cuint; x: ptr cdouble; gradient: ptr cdouble; func_data: pointer): cdouble {.cdecl.}          
 
@@ -74,4 +87,12 @@ proc newNlopOpt(opt_name: string, bounds: tuple[l, u: float]): NloptOpt =
   var status: nlopt_result
   result = NloptOpt(opt, opt_name, l_bound, u_bound, 0, 0, 0, 0, 0, 0, status, nil)
 
-proc setFunction(nlopt: NloptOpt,   
+proc setFunction(nlopt: NloptOpt, func: NloptFunc) =
+  # create a NLopt internal function object, which we use to
+  # pass our high level object down to the NLopt library
+  var nlopt_f: nlopt_func
+
+  #let n_params = len(
+  
+  #nlopt.status = nlopt_set_min_objective(nlopt.opt , 
+  
