@@ -61,19 +61,18 @@ type
 ##    (The meaning of "preconditioning" is algorithm-dependent.)
 
 type
-    ##  Naming conventions:
-    ## 
-    ##         NLOPT_{G/L}{D/N}_* 
-    ## 	             = global/local derivative/no-derivative optimization, 
-    ##               respectively 
-    ##  
-    ## _RAND algorithms involve some randomization.
-    ## 
-    ## _NOSCAL algorithms are *not* scaled to a unit hypercube
-    ## 	         (i.e. they are sensitive to the units of x)
-    ## 
-  nlopt_precond* = proc (n: cuint; x: ptr cdouble; v: ptr cdouble; vpre: ptr cdouble;
-                      data: pointer) {.cdecl.}
+  ##  Naming conventions:
+  ## 
+  ##         NLOPT_{G/L}{D/N}_* 
+  ## 	             = global/local derivative/no-derivative optimization, 
+  ##               respectively 
+  ##  
+  ## _RAND algorithms involve some randomization.
+  ## 
+  ## _NOSCAL algorithms are *not* scaled to a unit hypercube
+  ## 	         (i.e. they are sensitive to the units of x)
+  ## 
+  nlopt_precond* = proc (n: cuint; x: ptr cdouble; v: ptr cdouble; vpre: ptr cdouble; data: pointer) {.cdecl.}
   nlopt_algorithm* {.size: sizeof(cint).} = enum
     NLOPT_GN_DIRECT = 0, NLOPT_GN_DIRECT_L, NLOPT_GN_DIRECT_L_RAND,
     NLOPT_GN_DIRECT_NOSCAL, NLOPT_GN_DIRECT_L_NOSCAL,
