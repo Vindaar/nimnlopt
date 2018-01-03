@@ -3,6 +3,8 @@ import tables
 import macros
 import strutils
 
+
+
 when isMainModule:
   import unittest
   import sequtils
@@ -62,19 +64,19 @@ when isMainModule:
 # with addresses and pointer
 
 type
-  NloptOpt = object
-    optimizer: nlopt_opt
-    opt_name: string
-    l_bound: float
-    u_bound: float
-    xtol_rel: float
-    xtol_abs: float
-    ftol_rel: float
-    ftol_abs: float
-    maxtime: float
-    initial_step: float
-    status: nlopt_result
-    opt_func: nlopt_func
+  NloptOpt* = object
+    optimizer*: nlopt_opt
+    opt_name*: string
+    l_bound*: float
+    u_bound*: float
+    xtol_rel*: float
+    xtol_abs*: float
+    ftol_rel*: float
+    ftol_abs*: float
+    maxtime*: float
+    initial_step*: float
+    status*: nlopt_result
+    opt_func*: nlopt_func
 
   # NloptFunc is the user defined function, which takes
   # - an input seq or openArray (to be impl'd)
@@ -144,7 +146,7 @@ proc getNloptAlgorithmTable(): Table[string, nlopt_algorithm] =
              "LD_CCSAQ" : NLOPT_LD_CCSAQ,
              "GN_ESCH" : NLOPT_GN_ESCH }.toTable()
 
-proc newNlopOpt(opt_name: string, bounds: tuple[l, u: float] = (-Inf, Inf)): NloptOpt =
+proc newNloptOpt*(opt_name: string, bounds: tuple[l, u: float] = (-Inf, Inf)): NloptOpt =
   ## creator of a new NloptOpt object, which takes a string describing the algorithm to be
   ## used as well as (optionally) the lower and upper bounds to be used, as a tuple
   ## TODO: add options to also already add arguments for other fields of NloptOpt
@@ -183,7 +185,7 @@ proc newNlopOpt(opt_name: string, bounds: tuple[l, u: float] = (-Inf, Inf)): Nlo
   
 
 
-proc setFunction(nlopt: var NloptOpt, f: NloptRawFunc1D, f_obj: var object) =
+proc setFunction*(nlopt: var NloptOpt, f: NloptRawFunc1D, f_obj: var object) =
   # create a NLopt internal function object, which we use to
   # pass our high level object down to the NLopt library
   nlopt.opt_func = cast[nlopt_func](f)
@@ -195,7 +197,7 @@ proc setFunction(nlopt: var NloptOpt, f: NloptRawFunc1D, f_obj: var object) =
 # arguments, therefore can be done in one go
 macro set_nlopt_floatvals(func_name: static[string]): typed =
   let nim_func_name: string = """
-proc $#(nlopt: var NloptOpt, val: float) = 
+proc $#*(nlopt: var NloptOpt, val: float) = 
   nlopt.status = nlopt_$#(nlopt.optimizer, cdouble(val))""" % [func_name, func_name]
   result = parseStmt(nim_func_name)
 
@@ -223,7 +225,7 @@ template nlopt_write_or_raise(nlopt: var NloptOpt, f: untyped, field: untyped) =
     if nlopt.status != NLOPT_SUCCESS:
       raise newException(LibraryError, "Call to libnlopt failed with error: $#" % $nlopt.status)
 
-proc optimize[T](nlopt: var NloptOpt, params: seq[T]): tuple[p: seq[float], f: float] =
+proc optimize*[T](nlopt: var NloptOpt, params: seq[T]): tuple[p: seq[float], f: float] =
   ## function performing the actual optimization
   ## first sets all available tolerances, stopping criteria etc. then
   ## calls nlopt_optimize()
@@ -267,7 +269,7 @@ when isMainModule:
   let opt_name = "LN_COBYLA"
   # create new NloptOpt object, choosing an algorithm and already
   # setting upper and lower bounds
-  var opt: NloptOpt = newNlopOpt(opt_name, (-3.0, 3.0))
+  var opt: NloptOpt = newNloptOpt(opt_name, (-3.0, 3.0))
 
   # check whether setting an algorithm works
   let opt_name_tab = getNloptAlgorithmTable()
