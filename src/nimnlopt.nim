@@ -1,68 +1,13 @@
-import nlopt_wrapper
+import nimnlopt/nlopt_wrapper
+export nlopt_wrapper
 import tables
 import macros
 import strutils
 
-
-
-when isMainModule:
-  import unittest
-  import sequtils
-  import math
-  import times
-
-  type
-    FitObject = object
-      cluster: seq[tuple[a, b: int]]
-      xy: tuple[a, b: float]
-
-  proc excentricity(n: cuint, p: array[1, cdouble], grad: var array[1, cdouble], func_data: var pointer): cdouble {.cdecl.} =
-    # this function calculates the excentricity of a found pixel cluster using nimnlopt.
-    # Since no proper high level library is yet available, we need to pass a var pointer
-    # of func_data, which contains the x and y arrays in which the data is stored, in
-    # order to calculate the RMS variables
-
-    # first recover the data from the pointer to func_data, by casting the
-    # raw pointer to a Cluster object
-    let fit = cast[FitObject](func_data)
-    let c = fit.cluster
-
-    let (x, y) = fit.xy
-    var
-      sum_x: float = 0
-      sum_y: float = 0
-      sum_x2: float = 0
-      sum_y2: float = 0
-
-    for i in 0..<len(c):
-      let
-        new_x = cos(p[0]) * (float(c[i].a) - x) * 0.055 - sin(p[0]) * (float(c[i].b) - y) * 0.055
-        new_y = sin(p[0]) * (float(c[i].a) - x) * 0.055 + cos(p[0]) * (float(c[i].b) - y) * 0.055
-      sum_x += new_x
-      sum_y += new_y
-      sum_x2 += (new_x * new_x)
-      sum_y2 += (new_y * new_y)
-    
-    let
-      n_elements: float = float(len(c))
-      rms_x: float = sqrt( (sum_x2 / n_elements) - (sum_x * sum_x / n_elements / n_elements))
-      rms_y: float = sqrt( (sum_y2 / n_elements) - (sum_y * sum_y / n_elements / n_elements))    
-
-    #echo "sum_x2 / elements ", sum_x2 / n_elements, "sum_x * sum_x / elements / elements ", sum_x * sum_x / n_elements / n_elements
-    let exc = cdouble(rms_x / rms_y)
-    #echo "evaluated at p[0] = ", p[0], " to f(p[0]) = ", exc
-
-    # need to check whether grad is nil. Only used for some algorithms, otherwise a
-    # NULL pointer is handed in C
-    if addr(grad) != nil:
-      # normally we'd calculate the gradient for the current parameters, but we're
-      # not going to use it. Can also remove this whole if statement
-      discard
-    result = -exc
-# this file provides the high level functionality of the NLopt nim library,
-# especially containing the type conversion to compatible types and dealing
-# with addresses and pointer
-
+# this file provides the (extremely limited) high level functionality of the NLopt
+#  nim library, especially containing the type conversion to compatible types and 
+# dealing with addresses and pointer
+  
 type
   NloptOpt* = object
     optimizer*: nlopt_opt
@@ -99,7 +44,11 @@ type
   
 # * = proc (n: cuint; x: ptr cdouble; gradient: ptr cdouble; func_data: pointer): cdouble {.cdecl.}
 
-proc getNloptAlgorithmTable(): Table[string, nlopt_algorithm] =
+template withDebug(actions: untyped) =
+  when defined(DEBUG):
+    actions
+
+proc getNloptAlgorithmTable*(): Table[string, nlopt_algorithm] =
   result = { "GN_DIRECT" : NLOPT_GN_DIRECT,
              "GN_DIRECT_L" : NLOPT_GN_DIRECT_L,
              "GN_DIRECT_L_RAND" : NLOPT_GN_DIRECT_L_RAND,
@@ -179,12 +128,6 @@ proc newNloptOpt*(opt_name: string, bounds: tuple[l, u: float] = (-Inf, Inf)): N
                     status: status,
                     opt_func: f)
 
-  
-  
-
-  
-
-
 proc setFunction*(nlopt: var NloptOpt, f: NloptRawFunc1D, f_obj: var object) =
   # create a NLopt internal function object, which we use to
   # pass our high level object down to the NLopt library
@@ -207,7 +150,8 @@ set_nlopt_floatvals("set_ftol_abs")
 set_nlopt_floatvals("set_ftol_rel")
 set_nlopt_floatvals("set_maxtime")
 static:
-  echo getAst(set_nlopt_floatvals("set_ftol_rel")).repr
+  withDebug:
+    echo getAst(set_nlopt_floatvals("set_ftol_rel")).repr
 
 proc set_initial_step(nlopt: var NloptOpt, initial_step: float) =
   # simple wrapper for nlopt_set_initial_step, which takes care of
@@ -257,73 +201,3 @@ proc optimize*[T](nlopt: var NloptOpt, params: seq[T]): tuple[p: seq[float], f: 
   
   result = (p: p, f: f_p)
   
-when isMainModule:
-
-  template time_block(actions: untyped) {.dirty.} =
-    let t0 = epochTime()
-    for _ in 0..<10000:
-      actions
-    echo "Block took $# to execute" % $(epochTime() - t0)
-
-  #let opt_name = "GN_DIRECT_L" 
-  let opt_name = "LN_COBYLA"
-  # create new NloptOpt object, choosing an algorithm and already
-  # setting upper and lower bounds
-  var opt: NloptOpt = newNloptOpt(opt_name, (-3.0, 3.0))
-
-  # check whether setting an algorithm works
-  let opt_name_tab = getNloptAlgorithmTable()
-  check: nlopt_get_algorithm(opt.optimizer) == opt_name_tab[opt_name]
-
-  # check if bound setting works
-  var
-    x_l: cdouble = 0
-    x_u: cdouble = 0
-    status: nlopt_result = NLOPT_SUCCESS
-    
-  status = nlopt_get_lower_bounds(opt.optimizer, addr(x_l))
-  status = nlopt_get_upper_bounds(opt.optimizer, addr(x_u))
-  if status == NLOPT_SUCCESS:
-    check: x_l == opt.l_bound
-    check: x_u == opt.u_bound
-
-
-  # given two sequences from 0..99, one for x, the other for y,
-  # defines a line from (0, 0) to (99, 99), i.e. a line with
-  # slope 1 and thus, if interpreted as an ellipse, an ellipse
-  # which is rotated by 45 degrees and an eccentricity, which
-  # approaches Inf
-  let
-    x = toSeq(0..99)
-    y = toSeq(0..99)
-    xy = (45.0, 45.0)
-    zz = zip(x, y)
-  
-  var fobj = FitObject(cluster: zz, xy: xy)
-
-  opt.setFunction(excentricity, fobj)
-  # TODO: include a simple fit of a known distribution to check
-  # library is working
-  # check: 
-
-  # time the optimization procedure over 10_000 iterations, just for
-  # curiosity's sake
-  echo "Performing 10_000 iterations of full optimization..."
-  time_block:
-    var p: seq[float] = @[0.0]
-    # set initial step size
-    opt.initial_step = 0.1
-    # set some stopping criteria
-    opt.ftol_rel = 1e-9
-    opt.xtol_rel = 1e-9
-    
-    let (params, min_val) = opt.optimize(p)
-    #echo "Optimization resulted in f(p[0]) = $# at p[0] = $#" % [$min_val, $params[0]]
-    # the following check is only very rough, since we do not want to
-    # start comparing float values. Instead we simply round to the next
-    # integer and check whether it's 45, as we expect
-    check: abs(round(radToDeg(params[0]))) == 45
-    
-
-  # finally destroy the optimizer
-  nlopt_destroy(opt.optimizer)
