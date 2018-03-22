@@ -1,0 +1,26 @@
+* Nimnlopt
+
+This library provides a wrapper for the [[https://nlopt.readthedocs.io/en/latest/][Nlopt]] C library, which is a
+library for non-linear optimizations. It provides many different
+algorithms for easy comparison separated into local / gradient based,
+global / gradient based, local / derivative free and global /
+derivative free algorithms.
+
+In the current state documentation is missing and only very limited
+high-level support is available.
+
+** Installation
+
+The library is currently not part of the Nimble repository. If you
+wish to use it, you can install it using Nimble's git interface:
+#+BEGIN_SRC sh
+nimble install https://github.com/vindaar/nimnlopt
+#+END_SRC
+
+
+** License
+
+The license of the C library is found in the [[file:c_header/][c_header]] folder, which
+contains the headers as they were wrapped using c2nim. 
+
+The Nim code is published under the MIT license.
