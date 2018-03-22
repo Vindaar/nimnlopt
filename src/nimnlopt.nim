@@ -38,9 +38,7 @@ type
   # raw func pointer, which is the definition we need to hand to NLopt. For now demand
   # a raw func to be defined by the user, switch to macro creating NloptRawFunc from NloptFunc
   # at a later time
-  NloptRawFunc1D = proc(n: cuint, p: array[1, cdouble], grad: var array[1, cdouble], func_data: var pointer): cdouble {.cdecl.}
-  NloptRawFunc2D = proc(n: cuint, p: array[2, cdouble], grad: var array[2, cdouble], func_data: var pointer): cdouble {.cdecl.}
-  NloptRawFunc3D = proc(n: cuint, p: array[3, cdouble], grad: var array[3, cdouble], func_data: var pointer): cdouble {.cdecl.}  
+  NloptRawFunc[N: static[int]] = proc(n: cuint, p: array[N, cdouble], grad: var array[N, cdouble], func_data: var pointer): cdouble {.cdecl.}
   
 # * = proc (n: cuint; x: ptr cdouble; gradient: ptr cdouble; func_data: pointer): cdouble {.cdecl.}
 
@@ -128,7 +126,7 @@ proc newNloptOpt*(opt_name: string, bounds: tuple[l, u: float] = (-Inf, Inf)): N
                     status: status,
                     opt_func: f)
 
-proc setFunction*(nlopt: var NloptOpt, f: NloptRawFunc1D, f_obj: var object) =
+proc setFunction*(nlopt: var NloptOpt, f: NloptRawFunc, f_obj: var object) =
   # create a NLopt internal function object, which we use to
   # pass our high level object down to the NLopt library
   nlopt.opt_func = cast[nlopt_func](f)
