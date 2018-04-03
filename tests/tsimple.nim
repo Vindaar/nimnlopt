@@ -54,6 +54,9 @@ proc excentricity(n: cuint, p: array[1, cdouble], grad: var array[1, cdouble], f
     discard
   result = -exc
 
+proc excUser[T](p: seq[T], grad: var seq[T], func_data: object): float =
+  # 
+
 template time_block(actions: untyped) {.dirty.} =
   # just a benchmark template
   let t0 = epochTime()

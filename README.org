@@ -17,6 +17,11 @@ wish to use it, you can install it using Nimble's git interface:
 nimble install https://github.com/vindaar/nimnlopt
 #+END_SRC
 
+** Usage
+
+Besides a raw wrapper to be used with the =C= API (which is quite nice
+in my opinion), there are a few procedures to simplify the usage
+somewhat. 
 
 ** License
 

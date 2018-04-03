@@ -33,8 +33,9 @@ type
   #   - e.g. if for each parameter, f depends on an array of input data
   #     one can create an object, which stores said data, hand it to
   #     NloptFunc and it will be available in the function
+
 type    
-  #NloptFunc = proc[T](x: seq[T], gradient: var seq[T], func_data: object): float
+  #NloptUserFunc = proc[T](x: seq[T], gradient: var seq[T], func_data: object): float
   # raw func pointer, which is the definition we need to hand to NLopt. For now demand
   # a raw func to be defined by the user, switch to macro creating NloptRawFunc from NloptFunc
   # at a later time
@@ -133,6 +134,20 @@ proc setFunction*(nlopt: var NloptOpt, f: NloptRawFunc, f_obj: var object) =
   nlopt.status = nlopt_set_min_objective(nlopt.optimizer,
                                          nlopt.opt_func,
                                          cast[pointer](addr(f_obj)))
+
+proc setFunction*(nlopt: var NloptOpt, f: NloptUserFunc, f_obj: var object) =
+  # create a NLopt internal function object, which we use to
+  # pass our high level object down to the NLopt library
+
+  let n = 
+
+  proc rawFuncS(
+  
+  nlopt.opt_func = cast[nlopt_func](f)
+  nlopt.status = nlopt_set_min_objective(nlopt.optimizer,
+                                         nlopt.opt_func,
+                                         cast[pointer](addr(f_obj)))
+  
 
 # define macro to simply create all procs to set optimizer settings. All receive same
 # arguments, therefore can be done in one go
