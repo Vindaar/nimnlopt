@@ -12,21 +12,8 @@ type
     cluster: seq[tuple[a, b: int]]
     center: tuple[a, b: float]
 
-  FuncProto = proc (p: seq[float], varargs[seq[float]]): float
-
-  VarsStruct = ref object
-    userFunc: FuncProto
-
-proc optimizeImpl(n: cuint, p: array[1, cdouble], grad: var array[1, cdouble], func_data: var pointer): cdouble {.cdecl.} =
-  # func_data contains the actual function, which we fit
-  let ff = cast[VarsStruct](func_data)
-  let vecs = ff.
-
-#proc exc(p: seq[float], cl: seq[float]): float =
-  
-
 # define a helper proc, which will be optimized for
-proc excentricity(n: cuint, p: array[1, cdouble], grad: var array[1, cdouble], func_data: var pointer): cdouble {.cdecl.} =
+proc excentricity(p: seq[float], func_data: FitObject): float = 
   # this function calculates the excentricity of a found pixel cluster using nimnlopt.
   # Since no proper high level library is yet available, we need to pass a var pointer
   # of func_data, which contains the x and y arrays in which the data is stored, in
@@ -34,7 +21,7 @@ proc excentricity(n: cuint, p: array[1, cdouble], grad: var array[1, cdouble], f
 
   # first recover the data from the pointer to func_data, by casting the
   # raw pointer to a Cluster object
-  let fit = cast[FitObject](func_data)
+  let fit = func_data
   let c = fit.cluster
 
   let (centerX, centerY) = fit.center
@@ -61,11 +48,14 @@ proc excentricity(n: cuint, p: array[1, cdouble], grad: var array[1, cdouble], f
   let exc = cdouble(rms_x / rms_y)
   # need to check whether grad is nil. Only used for some algorithms, otherwise a
   # NULL pointer is handed in C
-  if addr(grad) != nil:
-    # normally we'd calculate the gradient for the current parameters, but we're
-    # not going to use it. Can also remove this whole if statement
-    discard
+  # TODO: add grad to `FuncProto` in some way
+  # if addr(grad) != nil:
+  #   # normally we'd calculate the gradient for the current parameters, but we're
+  #   # not going to use it. Can also remove this whole if statement
+  #   discard
   result = -exc
+
+#const exc: FuncProto[float] = 
 
 template time_block(actions: untyped) {.dirty.} =
   # just a benchmark template
@@ -107,9 +97,13 @@ when isMainModule:
     xy = (45.0, 45.0)
     zz = zip(x, y)
 
-  var fobj = FitObject(cluster: zz, xy: xy)
+  var fobj = FitObject(cluster: zz, center: xy)
+  # now instantiate the generic `VarStruct` object with our
+  # optimization function and our data object, we're using in
+  # that function
+  var vars = VarStruct[FitObject](userFunc: excentricity, data: fobj)
 
-  opt.setFunction(excentricity, fobj)
+  opt.setFunction(vars)
   # TODO: include a simple fit of a known distribution to check
   # library is working
   # check: 

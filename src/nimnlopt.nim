@@ -7,7 +7,7 @@ import strutils
 # this file provides the (extremely limited) high level functionality of the NLopt
 #  nim library, especially containing the type conversion to compatible types and 
 # dealing with addresses and pointer
-  
+
 type
   NloptOpt* = object
     optimizer*: nlopt_opt
@@ -33,13 +33,14 @@ type
   #   - e.g. if for each parameter, f depends on an array of input data
   #     one can create an object, which stores said data, hand it to
   #     NloptFunc and it will be available in the function
-type    
-  #NloptFunc = proc[T](x: seq[T], gradient: var seq[T], func_data: object): float
-  # raw func pointer, which is the definition we need to hand to NLopt. For now demand
-  # a raw func to be defined by the user, switch to macro creating NloptRawFunc from NloptFunc
-  # at a later time
-  NloptRawFunc[N: static[int]] = proc(n: cuint, p: array[N, cdouble], grad: var array[N, cdouble], func_data: var pointer): cdouble {.cdecl.}
-  
+type
+  FuncProto*[T] = proc (p: seq[float], func_data: T): float
+  VarStruct*[T] = ref object
+    # a generic object, which the user has to initialize with a
+    # function following the FuncProto signature and any custom 
+    # object in `data`
+    userFunc*: FuncProto[T]
+    data*: T
 # * = proc (n: cuint; x: ptr cdouble; gradient: ptr cdouble; func_data: pointer): cdouble {.cdecl.}
 
 template withDebug(actions: untyped) =
@@ -128,13 +129,41 @@ proc newNloptOpt*(opt_name: string, bounds: tuple[l, u: float] = (-Inf, Inf)): N
                     status: status,
                     opt_func: f)
 
-proc setFunction*(nlopt: var NloptOpt, f: NloptRawFunc, f_obj: var object) =
-  # create a NLopt internal function object, which we use to
-  # pass our high level object down to the NLopt library
-  nlopt.opt_func = cast[nlopt_func](f)
+template genOptimizeImpl(uType: untyped): untyped =
+  ## helper template to generate the wrapper around the user defined procedure
+  ## with the correctly inserted type of the user data object
+  
+  proc optimizeImpl(n: cuint, pPtr: ptr cdouble, grad: ptr cdouble, func_data: var pointer): cdouble {.cdecl.} =
+    # func_data contains the actual function, which we fit
+    var p = newSeq[float](n)
+    let pAr = cast[ptr UncheckedArray[float]](pPtr)
+    for i in 0 ..< n.int:
+      p[i] = pAr[i]
+    # using the type given to the template, cast the user function data
+    # to that type
+    # NOTE: while technically we have no way to assert that `uType` really is the
+    # type of `func_data`, thanks to the way we call the `genOptimizeImpl` template
+    # we do indeed make sure of that, since we call it in `setFunction`, and use
+    # the generic type `T`, which is precisely the type of `func_data` as the input.
+    let ff = cast[uType](func_data)
+    # get the user data object
+    let fobj = ff.data
+    # and the user function
+    let ufunc = ff.userFunc
+    # apply the function and return the result
+    result = ufunc(p, fobj)
+  optimizeImpl
+
+#proc setFunction*(nlopt: var NloptOpt, f: NloptRawFunc, f_obj: var object) =
+proc setFunction*[T](nlopt: var NloptOpt, fObj: var T) =
+  ## wrap the user defined proc, which is part of `fObj` (a field
+  ## of the object with name `userFunc`)
+  const genFunc = genOptimizeImpl(T)
+  
+  nlopt.opt_func = cast[nlopt_func](genFunc)
   nlopt.status = nlopt_set_min_objective(nlopt.optimizer,
                                          nlopt.opt_func,
-                                         cast[pointer](addr(f_obj)))
+                                         cast[pointer](addr(fObj)))
 
 # define macro to simply create all procs to set optimizer settings. All receive same
 # arguments, therefore can be done in one go
