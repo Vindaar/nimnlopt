@@ -10,7 +10,7 @@ import strutils
 type
   FitObject = object
     cluster: seq[tuple[a, b: int]]
-    xy: tuple[a, b: float]
+    center: tuple[a, b: float]
 
   FuncProto = proc (p: seq[float], varargs[seq[float]]): float
 
@@ -37,7 +37,7 @@ proc excentricity(n: cuint, p: array[1, cdouble], grad: var array[1, cdouble], f
   let fit = cast[FitObject](func_data)
   let c = fit.cluster
 
-  let (x, y) = fit.xy
+  let (centerX, centerY) = fit.center
   var
     sum_x: float = 0
     sum_y: float = 0
@@ -46,8 +46,8 @@ proc excentricity(n: cuint, p: array[1, cdouble], grad: var array[1, cdouble], f
 
   for i in 0..<len(c):
     let
-      new_x = cos(p[0]) * (float(c[i].a) - x) * 0.055 - sin(p[0]) * (float(c[i].b) - y) * 0.055
-      new_y = sin(p[0]) * (float(c[i].a) - x) * 0.055 + cos(p[0]) * (float(c[i].b) - y) * 0.055
+      new_x = cos(p[0]) * (float(c[i].a) - centerX) * 0.055 - sin(p[0]) * (float(c[i].b) - centerY) * 0.055
+      new_y = sin(p[0]) * (float(c[i].a) - centerX) * 0.055 + cos(p[0]) * (float(c[i].b) - centerY) * 0.055
     sum_x += new_x
     sum_y += new_y
     sum_x2 += (new_x * new_x)
