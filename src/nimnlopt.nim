@@ -47,6 +47,8 @@ template withDebug(actions: untyped) =
     actions
 
 proc getNloptAlgorithmTable*(): Table[string, nlopt_algorithm] =
+  # TODO: clean up nlopt_wrapper's definition of the `nlopt_algorithm`
+  # enum. And then define a custom pure enum to remove the `NLOPT_` prefixes.
   result = { "GN_DIRECT" : NLOPT_GN_DIRECT,
              "GN_DIRECT_L" : NLOPT_GN_DIRECT_L,
              "GN_DIRECT_L_RAND" : NLOPT_GN_DIRECT_L_RAND,

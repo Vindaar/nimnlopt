@@ -12,6 +12,19 @@ type
     cluster: seq[tuple[a, b: int]]
     xy: tuple[a, b: float]
 
+  FuncProto = proc (p: seq[float], varargs[seq[float]]): float
+
+  VarsStruct = ref object
+    userFunc: FuncProto
+
+proc optimizeImpl(n: cuint, p: array[1, cdouble], grad: var array[1, cdouble], func_data: var pointer): cdouble {.cdecl.} =
+  # func_data contains the actual function, which we fit
+  let ff = cast[VarsStruct](func_data)
+  let vecs = ff.
+
+#proc exc(p: seq[float], cl: seq[float]): float =
+  
+
 # define a helper proc, which will be optimized for
 proc excentricity(n: cuint, p: array[1, cdouble], grad: var array[1, cdouble], func_data: var pointer): cdouble {.cdecl.} =
   # this function calculates the excentricity of a found pixel cluster using nimnlopt.
