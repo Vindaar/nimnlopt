@@ -1,21 +1,13 @@
 import os
 import math
-import ../nlopt/nimnlopt
+import nimnlopt
 
 type
   my_constraint_data = object
     a: cdouble
     b: cdouble
 
-  # test_type = object
-  #   x: seq[float]
-  #   y: seq[float]
-  
 proc myfunc(n: cuint, x: array[2, cdouble], grad: var array[2, cdouble], my_func_data: var pointer): cdouble {.cdecl.} =
-  # let xy = cast[test_type](my_func_data)
-  # for i in 0..<len(xy.x):
-  #   echo xy.x[i]
-  
   if addr(grad) != nil:
     grad[0] = 0.0
     grad[1] = 0.5 / sqrt(x[1])
@@ -45,31 +37,22 @@ proc main() =
   data[1] = my_constraint_data(a: -1, b: 1)
   # algorithm and dimensionality
   echo NLOPT_LD_MMA
-  #opt = nlopt_create(NLOPT_LN_COBYLA, 2)
   opt = nlopt_create(NLOPT_LD_MMA, 2)
   var status: nlopt_result
   status = nlopt_set_lower_bounds(opt, addr(lb[0]))
-  echo status
-
-
-  # var xy: test_type
-  # xy = test_type(x: @[], y: @[])
-  # for i in 0..<100:
-  #   xy.x.add(float(i))
-  # for i in 100..<200:
-  #   xy.y.add(float(i))
   
-  status = nlopt_set_min_objective(opt, cast[nlopt_func](myfunc), nil)#cast[pointer](addr xy))
+  status = nlopt_set_min_objective(opt, cast[nlopt_func](myfunc), nil)
   echo status
 
   status = nlopt_add_inequality_constraint(opt, cast[nlopt_func](myconstraint), addr(data[0]), 1e-8)
   status = nlopt_add_inequality_constraint(opt, cast[nlopt_func](myconstraint), addr(data[1]), 1e-8)
 
   status = nlopt_set_xtol_rel(opt, 1e-4)
+  let a = nlopt_get_xtol_rel(opt)
   echo status  
   # the minimum objective value, upon return
   echo "starting minimization"
-  let t = nlopt_optimize(opt, addr(x[0]), addr(minf))#addr(x[0]), addr(minf))
+  let t = nlopt_optimize(opt, addr(x[0]), addr(minf))
   echo "done"
   if cast[int](t) < 0:
     echo t
@@ -79,6 +62,8 @@ proc main() =
     echo "found minimum at f(",x[0]," , ", x[1], "), = ", minf,"\n"
 
   nlopt_destroy(opt)
+  echo a
+  
 
 when isMainModule:
   main()
