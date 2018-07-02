@@ -208,8 +208,9 @@ template nlopt_write_or_raise(nlopt: var NloptOpt, f: untyped, field: untyped) =
   ## if so, also checks whether the call was successful. Otherwise raises a
   ## LibraryError with a (hopefully) helpful error message
   if field != 0:
-    #actions
     f(field)
+    withDebug:
+      echo "Setting value " & $field & " with " & astToStr(f(field))
     if nlopt.status != NLOPT_SUCCESS:
       raise newException(LibraryError, "Call to libnlopt failed with error: $#" % $nlopt.status)
 
