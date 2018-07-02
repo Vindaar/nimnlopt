@@ -2,7 +2,9 @@ import nimnlopt/nlopt_wrapper
 export nlopt_wrapper
 import tables
 import macros
-import strutils
+import strutils, sequtils, strformat
+import typetraits
+
 
 # this file provides the (extremely limited) high level functionality of the NLopt
 #  nim library, especially containing the type conversion to compatible types and 
@@ -36,15 +38,35 @@ type
   #     one can create an object, which stores said data, hand it to
   #     NloptFunc and it will be available in the function
 type
+
+  FuncKind* {.pure.} = enum
+    NoGrad, Grad
+  
   FuncProto*[T] = proc (p: seq[float], func_data: T): float
+  FuncProtoGrad*[T] = proc (p: seq[float], grad: seq[float], func_data: T): (float, seq[float])
   VarStruct*[T] = ref object
     # a generic object, which the user has to initialize with a
     # function following the FuncProto signature and any custom 
     # object in `data`
-    userFunc*: FuncProto[T]
+    case kind*: FuncKind:
+    of NoGrad:
+      userFunc*: FuncProto[T]
+    of Grad:
+      userFuncGrad*: FuncProtoGrad[T]
     data*: T
 # * = proc (n: cuint; x: ptr cdouble; gradient: ptr cdouble; func_data: pointer): cdouble {.cdecl.}
 
+# template newVarStruct*(uFunc: typed, fobj: typed): untyped =    
+proc newVarStruct*[T, U](uFunc: T, data: U): VarStruct[U] =
+  when T is FuncProto:
+    result = VarStruct[U](userFunc: uFunc, data: data, kind: FuncKind.NoGrad)
+  elif T is FuncProtoGrad:
+    result = VarStruct[U](userFuncGrad: uFunc, data: data, kind: FuncKind.Grad)
+  else:
+    raise newException(AssertionError, "Unexpected type for first argument of " &
+      "`newVarStruct`. Allowed proc types are: `FuncProto` and `FuncProtoGrad`.\n" &
+      "Is: " & T.name)
+    
 template withDebug(actions: untyped) =
   when defined(DEBUG):
     actions
@@ -143,11 +165,16 @@ proc newNloptOpt*(opt_name: string, nDims: int, bounds: seq[tuple[l, u: float]] 
 template genOptimizeImpl(uType: untyped): untyped =
   ## helper template to generate the wrapper around the user defined procedure
   ## with the correctly inserted type of the user data object
+  ## NOTE: in the current implementation the template is not even needed, because
+  ## the user may always use `VarStruct`. However, this in principle allows
+  ## the user to use a custom type as well. But that type will be bound to the
+  ## same field names, which makes it not useful?
   
-  proc optimizeImpl(n: cuint, pPtr: ptr cdouble, grad: ptr cdouble, func_data: var pointer): cdouble {.cdecl.} =
+  proc optimizeImpl(n: cuint, pPtr: ptr cdouble, gradPtr: ptr cdouble, func_data: var pointer): cdouble {.cdecl.} =
     # func_data contains the actual function, which we fit
     var p = newSeq[float](n)
     let pAr = cast[ptr UncheckedArray[float]](pPtr)
+
     for i in 0 ..< n.int:
       p[i] = pAr[i]
     # using the type given to the template, cast the user function data
@@ -160,9 +187,26 @@ template genOptimizeImpl(uType: untyped): untyped =
     # get the user data object
     let fobj = ff.data
     # and the user function
-    let ufunc = ff.userFunc
-    # apply the function and return the result
-    result = ufunc(p, fobj)
+    case ff.kind
+    of FuncKind.NoGrad:
+      let ufunc = ff.userFunc
+      # apply the function and return the result
+      result = ufunc(p, fobj)
+    of FuncKind.Grad:
+      # get the gradient data
+      var grad = newSeq[float](n)
+      var gradAr = cast[ptr UncheckedArray[float]](gradPtr)
+      
+      let ufunc = ff.userFuncGrad
+      # in this case grad is defined, set the values
+      for i in 0 ..< n.int:
+        grad[i] = gradAr[i]
+      let (res, newGrad) = ufunc(p, grad, fobj)
+      # set the new values for the gradient
+      for i in 0 ..< n.int:
+        gradAr[i] = newGrad[i]
+      # finally set result of proc
+      result = res      
   optimizeImpl
 
 #proc setFunction*(nlopt: var NloptOpt, f: NloptRawFunc, f_obj: var object) =
