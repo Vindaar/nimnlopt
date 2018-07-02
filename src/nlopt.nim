@@ -1,4 +1,4 @@
-import nimnlopt/nlopt_wrapper
+import nlopt/nlopt_wrapper
 export nlopt_wrapper
 import tables
 import macros

@@ -1,6 +1,6 @@
 import os
 import math
-import nimnlopt
+import nlopt
 
 type
   my_constraint_data = object

@@ -2,7 +2,7 @@ import unittest
 import sequtils
 import math
 import times
-import nimnlopt
+import nlopt
 import tables
 import strutils
 
