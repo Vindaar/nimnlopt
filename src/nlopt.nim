@@ -208,18 +208,18 @@ template genOptimizeImpl(uType: untyped): untyped =
       result = res      
   optimizeImpl
 
-#proc setFunction*(nlopt: var NloptOpt, f: NloptRawFunc, f_obj: var object) =
-proc setFunction*[T](nlopt: var NloptOpt, fObj: var T) =
+#proc setFunction*[T](nlopt: var NloptOpt, vStruct: T) =
+proc setFunction*[T](nlopt: var NloptOpt, vStruct: var VarStruct[T]) =
   ## wrap the user defined proc, which is part of `fObj` (a field
   ## of the object with name `userFunc`)
-  const genFunc = genOptimizeImpl(T)
+  const genFunc = genOptimizeImpl(type(vStruct))
   
   nlopt.opt_func = cast[nlopt_func](genFunc)
   nlopt.status = nlopt_set_min_objective(nlopt.optimizer,
                                          nlopt.opt_func,
-                                         cast[pointer](addr(fObj)))
+                                         cast[pointer](addr vStruct))
 
-proc addInequalityConstraint*[T](nlopt: var NloptOpt, fObj: var T) =
+proc addInequalityConstraint*[T](nlopt: var NloptOpt, vStruct: var VarStruct[T]) =
   ## adds an inequality constraint to the optimizer, i.e. a function, which
   ## is evaluated regarding some constraint on the data
   # TODO: add equivalent forr equality constraints
@@ -227,10 +227,10 @@ proc addInequalityConstraint*[T](nlopt: var NloptOpt, fObj: var T) =
 
   # the inequality function also needs to be of the same signature as the optimization
   # function, so either `FuncProto` or `FuncProtoGrad`
-  const genFunc = genOptimizeImpl(T)
+  const genFunc = genOptimizeImpl(type(vStruct))
   nlopt.status = nlopt_add_inequality_constraint(nlopt.optimizer,
                                                  cast[nlopt_func](genFunc),
-                                                 cast[pointer](addr fObj),
+                                                 cast[pointer](addr vStruct),
                                                  1e-8)
 
 proc setMaxEval*(nlopt: var NloptOpt, val: int) = 
