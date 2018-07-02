@@ -141,7 +141,7 @@ Signature:
     of Grad:
       userFuncGrad*: FuncProtoGrad[T]
     data*: T
-# where =FuncKind is
+# where ``FuncKind`` is
   FuncKind* {.pure.} = enum
     NoGrad, Grad
 #+END_SRC
