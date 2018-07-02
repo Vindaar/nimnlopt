@@ -55,7 +55,7 @@ exported wrapper functions. In that case care needs to be taken about
 the data types.
 
 The number of functions / types used by the user is reduced to 5
-functions / types:
+functions / 3 types:
 *** =proc newNloptOpt= 
 As the name suggests, used to create a new =NloptOpt= object.
 Signature:
@@ -127,6 +127,31 @@ optimization. These as well as the parameters and potential data from
 =func_data= need to be used to calculate the function value (first
 element of the result tuple) as well as the new gradients. The new
 gradients are returned as the second element of the result tuple.
+
+*** =type VarStruct=
+=VarStruct= is the unified container, which stores the user defined
+function of either type above and arbitrary user data, which will be
+handed to that function during each evaluation of the function.
+Signature:
+#+BEGIN_SRC nim
+  VarStruct*[T] = ref object
+    case kind*: FuncKind:
+    of NoGrad:
+      userFunc*: FuncProto[T]
+    of Grad:
+      userFuncGrad*: FuncProtoGrad[T]
+    data*: T
+# where =FuncKind is
+  FuncKind* {.pure.} = enum
+    NoGrad, Grad
+#+END_SRC
+It's a variant object, which either stores a =FuncProto= if the type
+is =NoGrad= or a =FuncProtoGrad= if it is =Grad=. In principle the
+=newVarStruct= does not need to be used. One can create such a variant
+object manually, but needs to take care to:
+1. set the =kind= field accordingly
+2. use the correct field name for the user function for this type.
+This is what the =newVarStruct= procedure takes care of.
 
 *** =proc setFunction= (TODO: rename?)
 This procedure is used to set the set the =FuncProco(Grad)= function
