@@ -220,6 +220,19 @@ proc setFunction*[T](nlopt: var NloptOpt, fObj: var T) =
                                          nlopt.opt_func,
                                          cast[pointer](addr(fObj)))
 
+proc addInequalityConstraint*[T](nlopt: var NloptOpt, fObj: var T) =
+  ## adds an inequality constraint to the optimizer, i.e. a function, which
+  ## is evaluated regarding some constraint on the data
+  # TODO: add equivalent forr equality constraints
+  # TODO: allow custom setting of the `tol` parameter of the constraints
+
+  # the inequality function also needs to be of the same signature as the optimization
+  # function, so either `FuncProto` or `FuncProtoGrad`
+  const genFunc = genOptimizeImpl(T)
+  nlopt.status = nlopt_add_inequality_constraint(nlopt.optimizer,
+                                                 cast[nlopt_func](genFunc),
+                                                 cast[pointer](addr fObj),
+                                                 1e-8)
 
 proc setMaxEval*(nlopt: var NloptOpt, val: int) = 
   nlopt.status = nlopt_set_maxeval(nlopt.optimizer, val.cint)
