@@ -20,6 +20,7 @@ type
     ftolRel*: float
     ftolAbs*: float
     maxTime*: float
+    maxEval*: int
     initialStep*: float
     status*: nlopt_result
     optFunc*: nlopt_func
@@ -175,6 +176,10 @@ proc setFunction*[T](nlopt: var NloptOpt, fObj: var T) =
                                          nlopt.opt_func,
                                          cast[pointer](addr(fObj)))
 
+
+proc setMaxEval*(nlopt: var NloptOpt, val: int) = 
+  nlopt.status = nlopt_set_maxeval(nlopt.optimizer, val.cint)
+  
 # define macro to simply create all procs to set optimizer settings. All receive same
 # arguments, therefore can be done in one go
 macro set_nlopt_floatvals(func_name: static[string]): typed =
@@ -221,22 +226,25 @@ proc optimize*[T](nlopt: var NloptOpt, params: seq[T]): tuple[p: seq[float], f: 
   ##            values for the resulting parameters, e.g.
   ##            ( @[p[0], p[1], ...], @[f(p[0]), f(p[1]), ...] )
   var
+    # start parameters
     p = params
-    f_p: cdouble = 0.1
+    # function value. Will be assigned to in the C library
+    f_p: cdouble
 
   # use template to set nlopt stopping criteria in libnlopt and also perform
   # checks on successful calls to libnlopt, while keeping bloat away
-  nlopt_write_or_raise(nlopt, nlopt.set_xtol_abs1, nlopt.xtol_abs)
-  nlopt_write_or_raise(nlopt, nlopt.set_xtol_rel, nlopt.xtol_rel)
-  nlopt_write_or_raise(nlopt, nlopt.set_ftol_abs, nlopt.ftol_abs)
-  nlopt_write_or_raise(nlopt, nlopt.set_ftol_rel, nlopt.ftol_rel)
-  nlopt_write_or_raise(nlopt, nlopt.set_maxtime, nlopt.maxtime)
-  nlopt_write_or_raise(nlopt, nlopt.set_initial_step, nlopt.initial_step)
+  nlopt_write_or_raise(nlopt, nlopt.setXtolAbs1, nlopt.xtolAbs)
+  nlopt_write_or_raise(nlopt, nlopt.setXtolRel, nlopt.xtolRel)
+  nlopt_write_or_raise(nlopt, nlopt.setFtolAbs, nlopt.ftolAbs)
+  nlopt_write_or_raise(nlopt, nlopt.setFtolRel, nlopt.ftolRel)
+  nlopt_write_or_raise(nlopt, nlopt.setMaxTime, nlopt.maxTime)
+  nlopt_write_or_raise(nlopt, nlopt.setMaxEval, nlopt.maxEval)  
+  nlopt_write_or_raise(nlopt, nlopt.setInitialStep, nlopt.initialStep)
 
   # now perform optimization
-  nlopt.status = nlopt_optimize(nlopt.optimizer, addr(p[0]), addr(f_p))
+  nlopt.status = nlopt_optimize(nlopt.optimizer, addr p[0], addr f_p)
   if nlopt.status < NLOPT_SUCCESS:
     echo "Warning: nlopt optimization failed with status $#!" % $nlopt.status
   
   result = (p: p, f: f_p)
-  
+
