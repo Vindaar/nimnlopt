@@ -1,13 +1,10 @@
-* Nimnlopt
+* Nlopt
 
 This library provides a wrapper for the [[https://nlopt.readthedocs.io/en/latest/][Nlopt]] C library, which is a
 library for non-linear optimizations. It provides many different
 algorithms for easy comparison separated into local / gradient based,
 global / gradient based, local / derivative free and global /
 derivative free algorithms.
-
-In the current state documentation is missing and only very limited
-high-level support is available.
 
 ** Installation
 
@@ -16,6 +13,165 @@ wish to use it, you can install it using Nimble's git interface:
 #+BEGIN_SRC sh
 nimble install https://github.com/vindaar/nimnlopt
 #+END_SRC
+
+Update: finally created a PR for the nimble repo:
+https://github.com/nim-lang/packages/issues/781
+Once it is merged, just install =nlopt= like any other nimble package:
+#+BEGIN_SRC sh
+nimble install nlopt
+#+END_SRC
+
+
+** Usage
+For general usage look at the test case in
+[[file:tests/tsimple.nim]]. Despite the name it should be reasonably
+concise to understand how the library interface is used. For an
+explanation of the different Nim procedures and types, see
+[[Documentation]] below.
+
+** Documentation
+
+The C library has an "object oriented like" structure. A central
+=nlopt_opt= type, which is created by the user. This object needs to
+be given to all other =nlopt= functions, of which there are many.
+See the documentation of the C library here: 
+https://nlopt.readthedocs.io/en/latest/NLopt_Reference/
+
+Here we only cover the functionality related to the usage of the Nim
+library.
+
+The Nim library partly follows that structure in the sense that it
+provides a slightly more astract =NloptOpt= type. This type stores the
+user defined settings (algorithm, dimensionality, bounds, step sizes,
+etc.) and writes them to the C library before the call to the
+optimization function.
+
+Instead of depending on a large amount of different getter and setter
+functions, the user sets all parameters on the =NloptOpt= object.
+
+Some functionality is still missing from the Nim interface. General
+optimization with and without gradients, including inequality bounds
+is available already. The other functionality can be used using the
+exported wrapper functions. In that case care needs to be taken about
+the data types.
+
+The number of functions / types used by the user is reduced to 5
+functions / types:
+*** =proc newNloptOpt= 
+As the name suggests, used to create a new =NloptOpt= object.
+Signature:
+#+BEGIN_SRC nim
+proc newNloptOpt(opt_name: string, nDims: int, bounds: seq[tuple[l, u: float]] = @[]): NloptOpt
+#+END_SRC
+Needs the algorithm =opt_name= as a string (to be changed to a pure enum), the
+dimensionality of the problem =nDims= and potential bounds on each
+dimension. The bounds are given as a sequence of tuples. Each tuple
+corresponds to one dimension of =nDims= with =(lower bound, upper
+bound)= of that dimension. Either empty, or bounds for all dimensions
+need to be given. If only a single dimension is to be bounded, set the
+other bounds to =-Inf= and =Inf=.
+
+*** =proc newVarStruct=
+To create a new =VarStruct= object. It is used to wrap the user
+defined optimization function and arbitrary data to be used in
+that function.
+Signature:
+#+BEGIN_SRC nim
+proc newVarStruct[T, U](uFunc: T, data: U): VarStruct[U]
+#+END_SRC
+due to a bug (?), we cannot constrain =T= unfortunately. =T= needs to
+be either a =FuncProto= or a =FuncProtoGrad=. See below for an
+explanation of these. Thus the custom function following either
+type will be haneded as =uFunc=.
+
+The =data= argument is an arbitrary user defined object, which is used
+to hand data to the user defined function. To be precise, it is the
+object, which will be given to =FuncProto= or =FuncProtoGrad= as
+explained below.
+
+*** =type FuncProto=
+One generic primitive procedure type, which the custom function to be
+optimized needs to match. This is the type to be used for algorithms,
+which are *gradient free* (i.e. the user does not have to calculate the
+gradients manually). 
+Signature:
+#+BEGIN_SRC nim
+FuncProto[T] = proc (p: seq[float], func_data: T): float
+#+END_SRC
+The first argument =p= are the parameters, which are optimized. The
+generic type =func_data= is an arbitrary type, which usually contains
+the data on which the optmization is done. But it can be any type, so
+it allows arbitrary data to be injected into the function, which can
+be used for the calculation. Internally =FuncProto= is wrapped by a
+function following the =nlopt_func= signature. The =func_data= is
+handed as a raw pointer to the C library and from there upon a
+function evaluation back to Nim.
+
+The return value of the function must be the value of the function
+after evaluation.
+
+*** =type FuncProtoGrad=
+One generic primitive procedure type, which the custom function to be
+optimized needs to match. This is the type to be used for algorithms,
+which are *not gradient free* (i.e. the user *does* have to calculate the
+gradients manually). 
+#+BEGIN_SRC nim
+FuncProtoGrad[T] = proc (p: seq[float], grad: seq[float], func_data: T): (float, seq[float])
+#+END_SRC
+The signature of =FuncProtoGrad= is identical to =FuncProto= (the =p=
+and =func_data= arguments serve the same purpose, read above for an
+explanation), with an additional =grad= argument as well as a changed
+return value.
+
+The =grad= argument will contain the current gradients of the
+optimization. These as well as the parameters and potential data from
+=func_data= need to be used to calculate the function value (first
+element of the result tuple) as well as the new gradients. The new
+gradients are returned as the second element of the result tuple.
+
+*** =proc setFunction= (TODO: rename?)
+This procedure is used to set the set the =FuncProco(Grad)= function
+as the =nlopt_func= of the C =nlopt_opt= object. If performs the
+wrapping of the user function into a suitable =nlopt_func=. In
+addition it also sets the data, which will be given to the user
+defined function.
+Signature:
+#+BEGIN_SRC nim
+proc setFunction[T](nlopt: var NloptOpt, vStruct: var VarStruct[T])
+#+END_SRC
+The first argument is the optmizer and =vStruct= is the user created
+=VarStruct= object. It is a =var= argument as well, since we want to
+avoid copying the data internally. 
+
+*** =proc addInequalityConstraint=
+Used to add inequality constraints to the optimization problem. The
+signature is exactly the same as for =setFunction=. One also creates a
+custom constraints function and a corresponding =VarStruct=
+object. This constraints function will be called in between calls to
+the actual function to be optimized. There may be one constraint for each
+dimension. See the Nlopt doc for more information.
+Signature:
+#+BEGIN_SRC nim
+proc addInequalityConstraint*[T](nlopt: var NloptOpt, vStruct: var VarStruct[T])
+#+END_SRC
+see the =setFunction= explanation above.
+
+*** =proc optimize=
+The actual function, which starts the optimization routine after
+everything has been set up. It sets all additional parameters of the
+=NloptOpt= (tolerances, step sizes etc.) before calling the actual
+=nlopt_optimize= function. 
+Signature:
+#+BEGIN_SRC nim
+proc optimize*[T](nlopt: var NloptOpt, params: seq[T]): tuple[p: seq[float], f: float] =
+#+END_SRC
+The first parameter is the configures =NloptOpt= object. =params= is
+the initial guess for the parameters to be optmized.
+After optimization the status of the optimization will be stored in
+the =status= field of the =nlopt= object. 
+
+The return value is a tuple of the sequence of optmized parameters =p=
+and the function value after the last evaluation of the function =f=.
 
 
 ** License
