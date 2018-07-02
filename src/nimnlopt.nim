@@ -127,7 +127,6 @@ proc newNloptOpt*(opt_name: string, nDims: int, bounds: seq[tuple[l, u: float]] 
   ## needs to be one tuple for each dimension
   ## If no bounds are given, they are set to `-Inf` to `Inf`
   ## TODO: add options to also already add arguments for other fields of NloptOpt
-  ## TODO: fix the bounds: currently we only allow global bounds (for all dimensions the same)!
   doAssert bounds.len == 0 or bounds.len == nDims, " need bounds for each dimension!"
   
   var
