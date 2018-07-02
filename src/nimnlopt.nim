@@ -11,17 +11,18 @@ import strutils
 type
   NloptOpt* = object
     optimizer*: nlopt_opt
-    opt_name*: string
-    l_bound*: float
-    u_bound*: float
-    xtol_rel*: float
-    xtol_abs*: float
-    ftol_rel*: float
-    ftol_abs*: float
-    maxtime*: float
-    initial_step*: float
+    optName*: string
+    nDims*: int
+    lBounds*: seq[float]
+    uBounds*: seq[float]
+    xtolRel*: float
+    xtolAbs*: float
+    ftolRel*: float
+    ftolAbs*: float
+    maxTime*: float
+    initialStep*: float
     status*: nlopt_result
-    opt_func*: nlopt_func
+    optFunc*: nlopt_func
 
   # NloptFunc is the user defined function, which takes
   # - an input seq or openArray (to be impl'd)
@@ -96,10 +97,16 @@ proc getNloptAlgorithmTable*(): Table[string, nlopt_algorithm] =
              "LD_CCSAQ" : NLOPT_LD_CCSAQ,
              "GN_ESCH" : NLOPT_GN_ESCH }.toTable()
 
-proc newNloptOpt*(opt_name: string, bounds: tuple[l, u: float] = (-Inf, Inf)): NloptOpt =
+proc newNloptOpt*(opt_name: string, nDims: int, bounds: seq[tuple[l, u: float]] = @[]): NloptOpt =
   ## creator of a new NloptOpt object, which takes a string describing the algorithm to be
   ## used as well as (optionally) the lower and upper bounds to be used, as a tuple
+  ## `nDims` is the dimensionality of the problem to be optimized. If `bounds` is given, there
+  ## needs to be one tuple for each dimension
+  ## If no bounds are given, they are set to `-Inf` to `Inf`
   ## TODO: add options to also already add arguments for other fields of NloptOpt
+  ## TODO: fix the bounds: currently we only allow global bounds (for all dimensions the same)!
+  doAssert bounds.len == 0 or bounds.len == nDims, " need bounds for each dimension!"
+  
   var
     opt: nlopt_opt
     status: nlopt_result
@@ -108,18 +115,21 @@ proc newNloptOpt*(opt_name: string, bounds: tuple[l, u: float] = (-Inf, Inf)): N
 
   let opt_name_table = getNloptAlgorithmTable()
   
-  opt = nlopt_create(opt_name_table[opt_name], 1)
+  opt = nlopt_create(opt_name_table[opt_name], nDims.cuint)
 
-  # set bounds
-  var (l_bound, u_bound) = bounds
-  if l_bound != -Inf and u_bound != Inf:
-    status = nlopt_set_lower_bounds(opt, addr(cdouble(l_bound)))
-    status = nlopt_set_upper_bounds(opt, addr(cdouble(u_bound)))
+  # extract and set bounds
+  var
+    lBounds = bounds.mapIt(it.l.cdouble)
+    uBounds = bounds.mapIt(it.u.cdouble)  
+  if bounds.len > 0:
+    status = nlopt_set_lower_bounds(opt, addr lBounds[0])
+    status = nlopt_set_upper_bounds(opt, addr uBounds[0])
     
   result = NloptOpt(optimizer: opt,
                     opt_name: opt_name,
-                    l_bound: l_bound,
-                    u_bound: u_bound,
+                    nDims: nDims,
+                    lBounds: lBounds,
+                    uBounds: uBounds,
                     xtol_rel: 0,
                     xtol_abs: 0,
                     ftol_rel: 0,
@@ -173,16 +183,16 @@ proc $#*(nlopt: var NloptOpt, val: float) =
   nlopt.status = nlopt_$#(nlopt.optimizer, cdouble(val))""" % [func_name, func_name]
   result = parseStmt(nim_func_name)
 
-set_nlopt_floatvals("set_xtol_abs1")
-set_nlopt_floatvals("set_xtol_rel")
-set_nlopt_floatvals("set_ftol_abs")
-set_nlopt_floatvals("set_ftol_rel")
-set_nlopt_floatvals("set_maxtime")
+set_nlopt_floatvals("setXtolAbs1")
+set_nlopt_floatvals("setXtolRel")
+set_nlopt_floatvals("setFtolAbs")
+set_nlopt_floatvals("setFtolRel")
+set_nlopt_floatvals("setMaxTime")
 static:
   withDebug:
     echo getAst(set_nlopt_floatvals("set_ftol_rel")).repr
 
-proc set_initial_step(nlopt: var NloptOpt, initial_step: float) =
+proc setInitialStep(nlopt: var NloptOpt, initial_step: float) =
   # simple wrapper for nlopt_set_initial_step, which takes care of
   # handing a ptr cdouble to the Nlopt function
   var dx: cdouble = cdouble(initial_step)
