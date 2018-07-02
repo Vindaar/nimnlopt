@@ -6,8 +6,11 @@ import nlopt
 import tables
 import strutils
 
-# define an object to store the data for the eccentricity proc
+# define an object to store the data for the different optimizations
 type
+  # the objects here are completely arbitrary and will be handed to the
+  # user defined function using the ``VarStruct`` object defined in
+  # nlopt.nim as its ``data`` field.
   FitObject = object
     cluster: seq[tuple[a, b: int]]
     center: tuple[a, b: float]

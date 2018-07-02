@@ -21,13 +21,12 @@ Once it is merged, just install =nlopt= like any other nimble package:
 nimble install nlopt
 #+END_SRC
 
-
 ** Usage
 For general usage look at the test case in
 [[file:tests/tsimple.nim]]. Despite the name it should be reasonably
 concise to understand how the library interface is used. For an
 explanation of the different Nim procedures and types, see
-[[Documentation]] below.
+Documentation below.
 
 ** Documentation
 
