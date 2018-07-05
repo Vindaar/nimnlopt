@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.2.0"
+version       = "0.3.0"
 author        = "Sebastian Schmidt"
 description   = "A wrapper of the C library NLOPT for non-linear optimization"
 license       = "MIT"

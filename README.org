@@ -8,15 +8,8 @@ derivative free algorithms.
 
 ** Installation
 
-The library is currently not part of the Nimble repository. If you
-wish to use it, you can install it using Nimble's git interface:
-#+BEGIN_SRC sh
-nimble install https://github.com/vindaar/nimnlopt
-#+END_SRC
-
-Update: finally created a PR for the nimble repo:
-https://github.com/nim-lang/packages/issues/781
-Once it is merged, just install =nlopt= like any other nimble package:
+This library is part of the Nimble repository. You can install it just
+like any other Nimble package:
 #+BEGIN_SRC sh
 nimble install nlopt
 #+END_SRC
