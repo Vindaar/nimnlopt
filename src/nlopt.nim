@@ -141,8 +141,8 @@ proc newNloptOpt*(opt_name: string, nDims: int, bounds: seq[tuple[l, u: float]] 
 
   # extract and set bounds
   var
-    lBounds = bounds.mapIt(it.l.cdouble)
-    uBounds = bounds.mapIt(it.u.cdouble)  
+    lBounds = bounds.mapIt(if it.l != it.u: it.l.cdouble else: -Inf)
+    uBounds = bounds.mapIt(if it.l != it.u: it.u.cdouble else: Inf)
   if bounds.len > 0:
     status = nlopt_set_lower_bounds(opt, addr lBounds[0])
     status = nlopt_set_upper_bounds(opt, addr uBounds[0])
