@@ -184,14 +184,14 @@ proc addInequalityConstraint*[T](nlopt: var NloptOpt, vStruct: var VarStruct[T])
                                                  cast[pointer](addr vStruct),
                                                  1e-8)
 
-proc setMaxEval*(nlopt: var NloptOpt, val: int) = 
+proc setMaxEval*(nlopt: var NloptOpt, val: int) =
   nlopt.status = nlopt_set_maxeval(nlopt.optimizer, val.cint)
-  
+
 # define macro to simply create all procs to set optimizer settings. All receive same
 # arguments, therefore can be done in one go
 macro set_nlopt_floatvals(func_name: static[string]): typed =
   let nim_func_name: string = """
-proc $#*(nlopt: var NloptOpt, val: float) = 
+proc $#*(nlopt: var NloptOpt, val: float) =
   nlopt.status = nlopt_$#(nlopt.optimizer, cdouble(val))""" % [func_name, func_name]
   result = parseStmt(nim_func_name)
 
@@ -209,6 +209,21 @@ proc setInitialStep(nlopt: var NloptOpt, initial_step: float) =
   # handing a ptr cdouble to the Nlopt function
   var dx: cdouble = cdouble(initial_step)
   nlopt.status = nlopt_set_initial_step(nlopt.optimizer, addr(dx))
+
+proc setLocalOptimizer*(nlopt: var NLoptOpt, local: NloptOpt) =
+  ## assigns the local optimizer `local` as the local optimizer for `nlopt`.
+  ## This is only applicable for certain algorithms. If `nlopt` has the
+  ## wrong algorithm, this call will fail!
+  case nlopt.optKind
+  of G_MLSL_LDS, G_MLSL, AUGLAG, AUGLAG_EQ:
+    # create the local optimizer
+    nlopt.status = nlopt.optimizer.nlopt_set_local_optimizer(local.optimizer)
+    if nlopt.status != NLOPT_SUCCESS:
+      raise newException(Exception, "Could not set local optimizer of kind " &
+        local.optName & "for parent optimizer of kind " & nlopt.optName & "!")
+  else:
+    raise newException(Exception, "Unsupported kind to set local optimizer: " & $nlopt.optKind)
+
 
 template nlopt_write_or_raise(nlopt: var NloptOpt, f: untyped, field: untyped) =
   ## simple template, which checks whether a call to libnlopt should be done and
@@ -246,13 +261,12 @@ proc optimize*[T](nlopt: var NloptOpt, params: seq[T]): tuple[p: seq[float], f: 
   nlopt_write_or_raise(nlopt, nlopt.setFtolAbs, nlopt.ftolAbs)
   nlopt_write_or_raise(nlopt, nlopt.setFtolRel, nlopt.ftolRel)
   nlopt_write_or_raise(nlopt, nlopt.setMaxTime, nlopt.maxTime)
-  nlopt_write_or_raise(nlopt, nlopt.setMaxEval, nlopt.maxEval)  
+  nlopt_write_or_raise(nlopt, nlopt.setMaxEval, nlopt.maxEval)
   nlopt_write_or_raise(nlopt, nlopt.setInitialStep, nlopt.initialStep)
 
   # now perform optimization
   nlopt.status = nlopt_optimize(nlopt.optimizer, addr p[0], addr f_p)
   if nlopt.status < NLOPT_SUCCESS:
     echo "Warning: nlopt optimization failed with status $#!" % $nlopt.status
-  
-  result = (p: p, f: f_p)
 
+  result = (p: p, f: f_p)
