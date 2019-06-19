@@ -1,5 +1,5 @@
 ##  Copyright (c) 2007-2014 Massachusetts Institute of Technology
-## 
+##
 ##  Permission is hereby granted, free of charge, to any person obtaining
 ##  a copy of this software and associated documentation files (the
 ##  "Software"), to deal in the Software without restriction, including
@@ -7,18 +7,18 @@
 ##  distribute, sublicense, and/or sell copies of the Software, and to
 ##  permit persons to whom the Software is furnished to do so, subject to
 ##  the following conditions:
-##  
+##
 ##  The above copyright notice and this permission notice shall be
 ##  included in all copies or substantial portions of the Software.
-##  
+##
 ##  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 ##  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 ##  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
 ##  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
 ##  LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 ##  OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-##  WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. 
-## 
+##  WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+##
 
 {.deadCodeElim: on.}
 const
@@ -57,37 +57,68 @@ type
   nlopt_mfunc* = proc (m: cuint; result: ptr cdouble; n: cuint; x: ptr cdouble;
                     gradient: ptr cdouble; func_data: pointer) {.cdecl.} ##  NULL if not needed
 
-##  A preconditioner, which preconditions v at x to return vpre. 
+##  A preconditioner, which preconditions v at x to return vpre.
 ##    (The meaning of "preconditioning" is algorithm-dependent.)
 
 type
   ##  Naming conventions:
-  ## 
-  ##         NLOPT_{G/L}{D/N}_* 
-  ## 	             = global/local derivative/no-derivative optimization, 
-  ##               respectively 
-  ##  
+  ##
+  ##         NLOPT_{G/L}{D/N}_*
+  ## 	             = global/local derivative/no-derivative optimization,
+  ##               respectively
+  ##
   ## _RAND algorithms involve some randomization.
-  ## 
+  ##
   ## _NOSCAL algorithms are *not* scaled to a unit hypercube
   ## 	         (i.e. they are sensitive to the units of x)
-  ## 
+  ##
   nlopt_precond* = proc (n: cuint; x: ptr cdouble; v: ptr cdouble; vpre: ptr cdouble; data: pointer) {.cdecl.}
   nlopt_algorithm* {.size: sizeof(cint).} = enum
-    NLOPT_GN_DIRECT = 0, NLOPT_GN_DIRECT_L, NLOPT_GN_DIRECT_L_RAND,
-    NLOPT_GN_DIRECT_NOSCAL, NLOPT_GN_DIRECT_L_NOSCAL,
-    NLOPT_GN_DIRECT_L_RAND_NOSCAL, NLOPT_GN_ORIG_DIRECT, NLOPT_GN_ORIG_DIRECT_L,
-    NLOPT_GD_STOGO, NLOPT_GD_STOGO_RAND, NLOPT_LD_LBFGS_NOCEDAL, NLOPT_LD_LBFGS,
-    NLOPT_LN_PRAXIS, NLOPT_LD_VAR1, NLOPT_LD_VAR2, NLOPT_LD_TNEWTON,
-    NLOPT_LD_TNEWTON_RESTART, NLOPT_LD_TNEWTON_PRECOND,
-    NLOPT_LD_TNEWTON_PRECOND_RESTART, NLOPT_GN_CRS2_LM, NLOPT_GN_MLSL,
-    NLOPT_GD_MLSL, NLOPT_GN_MLSL_LDS, NLOPT_GD_MLSL_LDS, NLOPT_LD_MMA,
-    NLOPT_LN_COBYLA, NLOPT_LN_NEWUOA, NLOPT_LN_NEWUOA_BOUND, NLOPT_LN_NELDERMEAD,
-    NLOPT_LN_SBPLX, NLOPT_LN_AUGLAG, NLOPT_LD_AUGLAG, NLOPT_LN_AUGLAG_EQ,
-    NLOPT_LD_AUGLAG_EQ, NLOPT_LN_BOBYQA, NLOPT_GN_ISRES, ##  new variants that require local_optimizer to be set,
-                                                      ## 	not with older constants for backwards compatibility
-    NLOPT_AUGLAG, NLOPT_AUGLAG_EQ, NLOPT_G_MLSL, NLOPT_G_MLSL_LDS, NLOPT_LD_SLSQP,
-    NLOPT_LD_CCSAQ, NLOPT_GN_ESCH, NLOPT_NUM_ALGORITHMS ##  not an algorithm, just the number of them
+    GN_DIRECT = 0,
+    GN_DIRECT_L,
+    GN_DIRECT_L_RAND,
+    GN_DIRECT_NOSCAL,
+    GN_DIRECT_L_NOSCAL,
+    GN_DIRECT_L_RAND_NOSCAL,
+    GN_ORIG_DIRECT,
+    GN_ORIG_DIRECT_L,
+    GD_STOGO,
+    GD_STOGO_RAND,
+    LD_LBFGS_NOCEDAL,
+    LD_LBFGS,
+    LN_PRAXIS,
+    LD_VAR1,
+    LD_VAR2,
+    LD_TNEWTON,
+    LD_TNEWTON_RESTART,
+    LD_TNEWTON_PRECOND,
+    LD_TNEWTON_PRECOND_RESTART,
+    GN_CRS2_LM,
+    GN_MLSL,
+    GD_MLSL,
+    GN_MLSL_LDS,
+    GD_MLSL_LDS,
+    LD_MMA,
+    LN_COBYLA,
+    LN_NEWUOA,
+    LN_NEWUOA_BOUND,
+    LN_NELDERMEAD,
+    LN_SBPLX,
+    LN_AUGLAG,
+    LD_AUGLAG,
+    LN_AUGLAG_EQ,
+    LD_AUGLAG_EQ,
+    LN_BOBYQA,
+    GN_ISRES, ##  new variants that require local_optimizer to be set,
+              ## 	not with older constants for backwards compatibility
+    AUGLAG,
+    AUGLAG_EQ,
+    G_MLSL,
+    G_MLSL_LDS,
+    LD_SLSQP,
+    LD_CCSAQ,
+    GN_ESCH,
+    NUM_ALGORITHMS ##  not an algorithm, just the number of them
 
 
 proc nlopt_algorithm_name*(a: nlopt_algorithm): cstring {.cdecl,
@@ -118,7 +149,7 @@ proc nlopt_version*(major: ptr cint; minor: ptr cint; bugfix: ptr cint) {.cdecl,
 
 type
   nlopt_opt_s* = object
-  
+
 
 ##  opaque structure, defined internally
 

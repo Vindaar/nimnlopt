@@ -7,12 +7,13 @@ import typetraits
 
 
 # this file provides the (extremely limited) high level functionality of the NLopt
-#  nim library, especially containing the type conversion to compatible types and 
+#  nim library, especially containing the type conversion to compatible types and
 # dealing with addresses and pointer
 
 type
   NloptOpt* = object
     optimizer*: nlopt_opt
+    optKind*: nlopt_algorithm
     optName*: string
     nDims*: int
     lBounds*: seq[float]
@@ -30,7 +31,7 @@ type
   # NloptFunc is the user defined function, which takes
   # - an input seq or openArray (to be impl'd)
   #   - one element for each parameter to fit
-  # - a mutable gradient for the gradients 
+  # - a mutable gradient for the gradients
   #   - d func / dx_i, i for each parameter in x
   # func_data: object = a user defined object, which can be used
   #   to hand specific data to the user defined function, if desired
@@ -56,7 +57,7 @@ type
     data*: T
 # * = proc (n: cuint; x: ptr cdouble; gradient: ptr cdouble; func_data: pointer): cdouble {.cdecl.}
 
-# template newVarStruct*(uFunc: typed, fobj: typed): untyped =    
+# template newVarStruct*(uFunc: typed, fobj: typed): untyped =
 proc newVarStruct*[T, U](uFunc: T, data: U): VarStruct[U] =
   when T is FuncProto:
     result = VarStruct[U](userFunc: uFunc, data: data, kind: FuncKind.NoGrad)
@@ -66,61 +67,12 @@ proc newVarStruct*[T, U](uFunc: T, data: U): VarStruct[U] =
     raise newException(AssertionError, "Unexpected type for first argument of " &
       "`newVarStruct`. Allowed proc types are: `FuncProto` and `FuncProtoGrad`.\n" &
       "Is: " & T.name)
-    
+
 template withDebug(actions: untyped) =
   when defined(DEBUG):
     actions
 
-proc getNloptAlgorithmTable*(): Table[string, nlopt_algorithm] =
-  # TODO: clean up nlopt_wrapper's definition of the `nlopt_algorithm`
-  # enum. And then define a custom pure enum to remove the `NLOPT_` prefixes.
-  result = { "GN_DIRECT" : NLOPT_GN_DIRECT,
-             "GN_DIRECT_L" : NLOPT_GN_DIRECT_L,
-             "GN_DIRECT_L_RAND" : NLOPT_GN_DIRECT_L_RAND,
-             "GN_DIRECT_NOSCAL" : NLOPT_GN_DIRECT_NOSCAL,
-             "GN_DIRECT_L_NOSCAL" : NLOPT_GN_DIRECT_L_NOSCAL,
-             "GN_DIRECT_L_RAND_NOSCAL" : NLOPT_GN_DIRECT_L_RAND_NOSCAL,
-             "GN_ORIG_DIRECT" : NLOPT_GN_ORIG_DIRECT,
-             "GN_ORIG_DIRECT_L" : NLOPT_GN_ORIG_DIRECT_L,
-             "GD_STOGO" : NLOPT_GD_STOGO,
-             "GD_STOGO_RAND" : NLOPT_GD_STOGO_RAND,
-             "LD_LBFGS_NOCEDAL" : NLOPT_LD_LBFGS_NOCEDAL,
-             "LD_LBFGS" : NLOPT_LD_LBFGS,
-             "LN_PRAXIS" : NLOPT_LN_PRAXIS,
-             "LD_VAR1" : NLOPT_LD_VAR1,
-             "LD_VAR2" : NLOPT_LD_VAR2,
-             "LD_TNEWTON" : NLOPT_LD_TNEWTON,
-             "LD_TNEWTON_RESTART" : NLOPT_LD_TNEWTON_RESTART,
-             "LD_TNEWTON_PRECOND" : NLOPT_LD_TNEWTON_PRECOND,
-             "LD_TNEWTON_PRECOND_RESTART" : NLOPT_LD_TNEWTON_PRECOND_RESTART,
-             "GN_CRS2_LM" : NLOPT_GN_CRS2_LM,
-             "GN_MLSL" : NLOPT_GN_MLSL,
-             "GD_MLSL" : NLOPT_GD_MLSL,
-             "GN_MLSL_LDS" : NLOPT_GN_MLSL_LDS,
-             "GD_MLSL_LDS" : NLOPT_GD_MLSL_LDS,
-             "LD_MMA" : NLOPT_LD_MMA,
-             "LN_COBYLA" : NLOPT_LN_COBYLA,
-             "LN_NEWUOA" : NLOPT_LN_NEWUOA,
-             "LN_NEWUOA_BOUND" : NLOPT_LN_NEWUOA_BOUND,
-             "LN_NELDERMEAD" : NLOPT_LN_NELDERMEAD,
-             "LN_SBPLX" : NLOPT_LN_SBPLX,
-             "LN_AUGLAG" : NLOPT_LN_AUGLAG,
-             "LD_AUGLAG" : NLOPT_LD_AUGLAG,
-             "LN_AUGLAG_EQ" : NLOPT_LN_AUGLAG_EQ,
-             "LD_AUGLAG_EQ" : NLOPT_LD_AUGLAG_EQ,
-             "LN_BOBYQA" : NLOPT_LN_BOBYQA,
-             "GN_ISRES" : NLOPT_GN_ISRES,
-             # new variants that require local_optimizer to be set,
-             # not with older constants for backwards compatibility
-             "AUGLAG" : NLOPT_AUGLAG,
-             "AUGLAG_EQ" : NLOPT_AUGLAG_EQ,
-             "G_MLSL" : NLOPT_G_MLSL,
-             "G_MLSL_LDS" : NLOPT_G_MLSL_LDS,
-             "LD_SLSQP" : NLOPT_LD_SLSQP,
-             "LD_CCSAQ" : NLOPT_LD_CCSAQ,
-             "GN_ESCH" : NLOPT_GN_ESCH }.toTable()
-
-proc newNloptOpt*(opt_name: string, nDims: int, bounds: seq[tuple[l, u: float]] = @[]): NloptOpt =
+proc newNloptOpt*(optName: nloptAlgorithm, nDims: int, bounds: seq[tuple[l, u: float]] = @[]): NloptOpt =
   ## creator of a new NloptOpt object, which takes a string describing the algorithm to be
   ## used as well as (optionally) the lower and upper bounds to be used, as a tuple
   ## `nDims` is the dimensionality of the problem to be optimized. If `bounds` is given, there
@@ -128,16 +80,14 @@ proc newNloptOpt*(opt_name: string, nDims: int, bounds: seq[tuple[l, u: float]] 
   ## If no bounds are given, they are set to `-Inf` to `Inf`
   ## TODO: add options to also already add arguments for other fields of NloptOpt
   doAssert bounds.len == 0 or bounds.len == nDims, " need bounds for each dimension!"
-  
+
   var
     opt: nlopt_opt
     status: nlopt_result
     f: nlopt_func
   status = NLOPT_SUCCESS
 
-  let opt_name_table = getNloptAlgorithmTable()
-  
-  opt = nlopt_create(opt_name_table[opt_name], nDims.cuint)
+  opt = nlopt_create(optName, nDims.cuint)
 
   # extract and set bounds
   var
@@ -146,9 +96,10 @@ proc newNloptOpt*(opt_name: string, nDims: int, bounds: seq[tuple[l, u: float]] 
   if bounds.len > 0:
     status = nlopt_set_lower_bounds(opt, addr lBounds[0])
     status = nlopt_set_upper_bounds(opt, addr uBounds[0])
-    
+
   result = NloptOpt(optimizer: opt,
-                    opt_name: opt_name,
+                    optKind: optName,
+                    opt_name: $optName,
                     nDims: nDims,
                     lBounds: lBounds,
                     uBounds: uBounds,
@@ -168,7 +119,7 @@ template genOptimizeImpl(uType: untyped): untyped =
   ## the user may always use `VarStruct`. However, this in principle allows
   ## the user to use a custom type as well. But that type will be bound to the
   ## same field names, which makes it not useful?
-  
+
   proc optimizeImpl(n: cuint, pPtr: ptr cdouble, gradPtr: ptr cdouble, func_data: var pointer): cdouble {.cdecl.} =
     # func_data contains the actual function, which we fit
     var p = newSeq[float](n)
