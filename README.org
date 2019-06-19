@@ -108,18 +108,64 @@ optimized needs to match. This is the type to be used for algorithms,
 which are *not gradient free* (i.e. the user *does* have to calculate the
 gradients manually). 
 #+BEGIN_SRC nim
-FuncProtoGrad[T] = proc (p: seq[float], grad: seq[float], func_data: T): (float, seq[float])
+FuncProtoGrad[T] = proc (p: seq[float], func_data: T): (float, seq[float])
 #+END_SRC
 The signature of =FuncProtoGrad= is identical to =FuncProto= (the =p=
 and =func_data= arguments serve the same purpose, read above for an
-explanation), with an additional =grad= argument as well as a changed
-return value.
+explanation), with the exception of the return type.
 
-The =grad= argument will contain the current gradients of the
-optimization. These as well as the parameters and potential data from
-=func_data= need to be used to calculate the function value (first
-element of the result tuple) as well as the new gradients. The new
-gradients are returned as the second element of the result tuple.
+The second element of the return tuple has to be the gradients of the
+function with respect to the parameters. These will be returned back
+to NLopt to take into account for the calculation of the next parameters.
+
+In many cases it may be enough to perform numeric differentiation,
+e.g. via the [[https://en.wikipedia.org/wiki/Numerical_differentiation][symmetric difference quotient]].
+
+A possible implementation might look something like:
+#+BEGIN_SRC nim
+proc myFunc(p: seq[float], fitObj: FitObject): (float, seq[float]) =
+  ## `FitObject` takes the place of `func_data`. 
+  ## In this case:
+  ## type
+  ##   FitObject = object
+  ##     x, y: seq[float]
+  # NOTE: do not need last gradients
+  let x = fitObj.x
+  let y = fitObj.y
+  # a seq for the resulting gradients
+  var gradRes = newSeq[float](p.len)
+  # a float for the function evaluation at `p`
+  var res = 0.0
+  # a variable for the small change we take in `p_i`
+  var h: float  
+  # a temp variable for the individual part of a `Chi^2` sum
+  var diff = 0.0
+  proc fn(params: seq[float]): float =
+    # calculate the model's Y position to be used to perform a curve fit 
+    # of `funcToCall` to `(x, y)` data
+    let fitY = x.mapIt(funcToCall(params, it))
+    for i in 0 .. x.high:
+      diff = (y[i] - fitY[i]) / yErr[i]
+      result += pow(diff, 2.0)
+    # result of our internal `f(p)` is the reduced Pearson's Chi^2
+    result = result / (x.len - p.len).float
+  # the function evaluation is simply our `Chi^2` value of the parameters
+  res = fn(p)
+  # now calculate the numerical derivative
+  for i in 0 .. gradRes.high:
+    # calc some reasonable `h` for this parameter
+    h = p[i] * sqrt(epsilon(float64))
+    var
+      modParsUp = p
+      modParsDown = p
+    modParsUp[i] = p[i] + h
+    modParsDown[i] = p[i] - h
+    # numerical partial derivative according to `symmetric difference quotient`
+    gradRes[i] = (fn(modParsUp) - fn(modParsDown)) / (2.0 * h)
+  result = (res, gradRes)
+#+END_SRC
+The above can be easily wrapped in a template for instance to lift any
+function =funcToCall= to be fitable via Pearson's chi-squared test. 
 
 *** =type VarStruct=
 =VarStruct= is the unified container, which stores the user defined

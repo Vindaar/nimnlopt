@@ -42,12 +42,12 @@ type
 
   FuncKind* {.pure.} = enum
     NoGrad, Grad
-  
+
   FuncProto*[T] = proc (p: seq[float], func_data: T): float
-  FuncProtoGrad*[T] = proc (p: seq[float], grad: seq[float], func_data: T): (float, seq[float])
+  FuncProtoGrad*[T] = proc (p: seq[float], func_data: T): (float, seq[float])
   VarStruct*[T] = ref object
     # a generic object, which the user has to initialize with a
-    # function following the FuncProto signature and any custom 
+    # function following the FuncProto signature and any custom
     # object in `data`
     case kind*: FuncKind:
     of NoGrad:
@@ -144,19 +144,20 @@ template genOptimizeImpl(uType: untyped): untyped =
       result = ufunc(p, fobj)
     of FuncKind.Grad:
       # get the gradient data
-      var grad = newSeq[float](n)
-      var gradAr = cast[ptr UncheckedArray[float]](gradPtr)
-      
       let ufunc = ff.userFuncGrad
-      # in this case grad is defined, set the values
-      for i in 0 ..< n.int:
-        grad[i] = gradAr[i]
-      let (res, newGrad) = ufunc(p, grad, fobj)
-      # set the new values for the gradient
-      for i in 0 ..< n.int:
-        gradAr[i] = newGrad[i]
-      # finally set result of proc
-      result = res      
+      if not gradPtr.isNil:
+        var gradAr = cast[ptr UncheckedArray[float]](gradPtr)
+        # in this case grad is defined, set the values
+        let (res, newGrad) = ufunc(p, fobj)
+        # set the new values for the gradient
+        for i in 0 ..< n.int:
+          gradAr[i] = newGrad[i]
+        # finally set result of proc
+        result = res
+      else:
+        let (res, newGrad) = ufunc(p, fobj)
+        result = res
+
   optimizeImpl
 
 #proc setFunction*[T](nlopt: var NloptOpt, vStruct: T) =
@@ -164,7 +165,7 @@ proc setFunction*[T](nlopt: var NloptOpt, vStruct: var VarStruct[T]) =
   ## wrap the user defined proc, which is part of `fObj` (a field
   ## of the object with name `userFunc`)
   const genFunc = genOptimizeImpl(type(vStruct))
-  
+
   nlopt.opt_func = cast[nlopt_func](genFunc)
   nlopt.status = nlopt_set_min_objective(nlopt.optimizer,
                                          nlopt.opt_func,
