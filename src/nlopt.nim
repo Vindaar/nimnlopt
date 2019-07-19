@@ -10,24 +10,6 @@ import typetraits
 #  nim library, especially containing the type conversion to compatible types and
 # dealing with addresses and pointer
 
-type
-  NloptOpt* = object
-    optimizer*: nlopt_opt
-    optKind*: nlopt_algorithm
-    optName*: string
-    nDims*: int
-    lBounds*: seq[float]
-    uBounds*: seq[float]
-    xtolRel*: float
-    xtolAbs*: float
-    ftolRel*: float
-    ftolAbs*: float
-    maxTime*: float
-    maxEval*: int
-    initialStep*: float
-    status*: nlopt_result
-    optFunc*: nlopt_func
-
   # NloptFunc is the user defined function, which takes
   # - an input seq or openArray (to be impl'd)
   #   - one element for each parameter to fit
@@ -55,10 +37,29 @@ type
     of Grad:
       userFuncGrad*: FuncProtoGrad[T]
     data*: T
-# * = proc (n: cuint; x: ptr cdouble; gradient: ptr cdouble; func_data: pointer): cdouble {.cdecl.}
 
-# template newVarStruct*(uFunc: typed, fobj: typed): untyped =
+  NloptOpt*[T] = object
+    optimizer*: nlopt_opt
+    userData: VarStruct[T] # reference to the user data to avoid it being GC'ed
+    optKind*: nlopt_algorithm
+    optName*: string
+    nDims*: int
+    lBounds*: seq[float]
+    uBounds*: seq[float]
+    xtolRel*: float
+    xtolAbs*: float
+    ftolRel*: float
+    ftolAbs*: float
+    maxTime*: float
+    maxEval*: int
+    initialStep*: float
+    status*: nlopt_result
+    optFunc*: nlopt_func
+
 proc newVarStruct*[T, U](uFunc: T, data: U): VarStruct[U] =
+  # NOTE: If `U` itself is a generic, calling this function may run into:
+  # https://github.com/nim-lang/Nim/issues/11778
+  # In that case create the VarStruct manually.
   when T is FuncProto:
     result = VarStruct[U](userFunc: uFunc, data: data, kind: FuncKind.NoGrad)
   elif T is FuncProtoGrad:
@@ -72,7 +73,7 @@ template withDebug(actions: untyped) =
   when defined(DEBUG):
     actions
 
-proc newNloptOpt*(optName: nloptAlgorithm, nDims: int, bounds: seq[tuple[l, u: float]] = @[]): NloptOpt =
+proc newNloptOpt*[T](optName: nloptAlgorithm, nDims: int, bounds: seq[tuple[l, u: float]] = @[]): NloptOpt[T] =
   ## creator of a new NloptOpt object, which takes a string describing the algorithm to be
   ## used as well as (optionally) the lower and upper bounds to be used, as a tuple
   ## `nDims` is the dimensionality of the problem to be optimized. If `bounds` is given, there
@@ -97,7 +98,7 @@ proc newNloptOpt*(optName: nloptAlgorithm, nDims: int, bounds: seq[tuple[l, u: f
     status = nlopt_set_lower_bounds(opt, addr lBounds[0])
     status = nlopt_set_upper_bounds(opt, addr uBounds[0])
 
-  result = NloptOpt(optimizer: opt,
+  result = NloptOpt[T](optimizer: opt,
                     optKind: optName,
                     opt_name: $optName,
                     nDims: nDims,
@@ -166,10 +167,14 @@ proc setFunction*[T](nlopt: var NloptOpt, vStruct: var VarStruct[T]) =
   ## of the object with name `userFunc`)
   const genFunc = genOptimizeImpl(type(vStruct))
 
+  # assign `vStruct` as `userData`, so that we keep a reference to it around
+  # so that `addr nlopt.userData` is valid, even if the `vStruct` given goes
+  # out of scope in the calling scope of `setFunction`.
+  nlopt.userData = vStruct
   nlopt.opt_func = cast[nlopt_func](genFunc)
   nlopt.status = nlopt_set_min_objective(nlopt.optimizer,
                                          nlopt.opt_func,
-                                         cast[pointer](addr vStruct))
+                                         cast[pointer](addr nlopt.userData))
 
 proc addInequalityConstraint*[T](nlopt: var NloptOpt, vStruct: var VarStruct[T]) =
   ## adds an inequality constraint to the optimizer, i.e. a function, which
