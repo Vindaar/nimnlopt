@@ -160,7 +160,6 @@ template genOptimizeImpl(uType: untyped): untyped =
 
   optimizeImpl
 
-#proc setFunction*[T](nlopt: var NloptOpt, vStruct: T) =
 proc setFunction*[T](nlopt: var NloptOpt, vStruct: VarStruct[T],
                      minimize: static bool = true) =
   ## wrap the user defined proc, which is part of `fObj` (a field
@@ -281,3 +280,8 @@ proc optimize*[T](nlopt: var NloptOpt, params: seq[T]): tuple[p: seq[float], f: 
     echo "Warning: nlopt optimization failed with status $#!" % $nlopt.status
 
   result = (p: p, f: f_p)
+
+proc destroy*(nlopt: var NloptOpt) =
+  ## destroys the optimizer itself and frees the memory of the user data
+  nlopt_destroy(nlopt.optimizer)
+  #dealloc(nlopt.userData)
