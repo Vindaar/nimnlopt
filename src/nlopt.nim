@@ -137,7 +137,6 @@ template genOptimizeImpl(uType: untyped): untyped =
     let ff = cast[uType](func_data)
     # get the user data object
     let fobj = ff.data
-    # and the user function
     case ff.kind
     of FuncKind.NoGrad:
       let ufunc = ff.userFunc
@@ -162,24 +161,30 @@ template genOptimizeImpl(uType: untyped): untyped =
   optimizeImpl
 
 #proc setFunction*[T](nlopt: var NloptOpt, vStruct: T) =
-proc setFunction*[T](nlopt: var NloptOpt, vStruct: var VarStruct[T]) =
+proc setFunction*[T](nlopt: var NloptOpt, vStruct: VarStruct[T],
+                     minimize: static bool = true) =
   ## wrap the user defined proc, which is part of `fObj` (a field
   ## of the object with name `userFunc`)
   const genFunc = genOptimizeImpl(type(vStruct))
-
   # assign `vStruct` as `userData`, so that we keep a reference to it around
   # so that `addr nlopt.userData` is valid, even if the `vStruct` given goes
   # out of scope in the calling scope of `setFunction`.
   nlopt.userData = vStruct
   nlopt.opt_func = cast[nlopt_func](genFunc)
-  nlopt.status = nlopt_set_min_objective(nlopt.optimizer,
-                                         nlopt.opt_func,
-                                         cast[pointer](addr nlopt.userData))
+  when minimize:
+    nlopt.status = nlopt_set_min_objective(nlopt.optimizer,
+                                           nlopt.opt_func,
+                                           cast[pointer](addr nlopt.userData))
+  else:
+    # else maximize the problem
+    nlopt.status = nlopt_set_max_objective(nlopt.optimizer,
+                                           nlopt.opt_func,
+                                           cast[pointer](addr nlopt.userData))
 
 proc addInequalityConstraint*[T](nlopt: var NloptOpt, vStruct: var VarStruct[T]) =
   ## adds an inequality constraint to the optimizer, i.e. a function, which
   ## is evaluated regarding some constraint on the data
-  # TODO: add equivalent forr equality constraints
+  # TODO: add equivalent for equality constraints
   # TODO: allow custom setting of the `tol` parameter of the constraints
 
   # the inequality function also needs to be of the same signature as the optimization
