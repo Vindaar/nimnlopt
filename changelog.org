@@ -1,0 +1,3 @@
+* v0.3.2
+- fix types of =lBounds=, =uBounds= assigned to =NloptOpt= argument to
+  avoid codegen error when compiling with ARC
